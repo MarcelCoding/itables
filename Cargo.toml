@@ -1,0 +1,21 @@
+[package]
+name = "itables"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+image = { version = "0.24", default-features = false, features = ["jpeg", "png"] }
+leptess = "0.13"
+
+#show-image = { version = "0.12", features = ["image"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# by overriding our dependencies' compilation settings, we can further optimize for size
+# https://docs.rust-embedded.org/book/unsorted/speed-vs-size.html#optimizing-dependencies
+[profile.release.package."*"]
+codegen-units = 1
