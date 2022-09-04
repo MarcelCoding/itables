@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-image = { version = "0.24", default-features = false, features = ["jpeg", "png"] }
+image = { version = "0.24", default-features = false, features = ["png"] }
 leptess = "0.13"
-
-#show-image = { version = "0.12", features = ["image"] }
+anyhow = "1.0"
 
 [profile.release]
 lto = true

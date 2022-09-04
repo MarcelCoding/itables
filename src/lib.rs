@@ -1,19 +1,22 @@
-use std::io;
-use std::io::Cursor;
+use std::io::{BufRead, Cursor, Seek};
+use std::path::Path;
 
-use image::{ImageOutputFormat, Pixel};
-// use show_image::event;
+use image::{DynamicImage, ImageFormat, ImageOutputFormat, Pixel};
 use leptess::capi::Box;
 use leptess::LepTess;
 
-// #[show_image::main]
-fn main() -> io::Result<()> {
-  let file = "vertretungsplan-bgy-1.jpg";
+pub enum Format {}
 
-  let image = image::open(&file).unwrap().adjust_contrast(20.0).to_luma8();
+pub fn extract_table_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<Vec<String>>> {
+  extract_table_image(image::open(path)?)
+}
 
-  // let mut new_img = GrayImage::new(image.width(), image.height());
-  // new_img.fill(0xff);
+pub fn extract_table_png_buf<R: BufRead + Seek>(buf: R) -> anyhow::Result<Vec<Vec<String>>> {
+  extract_table_image(image::load(buf, ImageFormat::Png)?)
+}
+
+pub fn extract_table_image(image: DynamicImage) -> anyhow::Result<Vec<Vec<String>>> {
+  let image = image.adjust_contrast(20.0).to_luma8();
 
   let mut ylines = Vec::new();
 
@@ -82,13 +85,13 @@ fn main() -> io::Result<()> {
   let lines_y = deduplicate_lines(new_y_lines, 10, 10);
   let lines_x = deduplicate_lines(new_x_lines, 10, 10);
 
-  let mut tess = LepTess::new(None, "deu").unwrap();
+  let mut tess = LepTess::new(None, "deu")?;
 
   {
     let mut buf = Vec::new();
     let mut cursor = Cursor::new(&mut buf);
-    image.write_to(&mut cursor, ImageOutputFormat::Png).unwrap();
-    tess.set_image_from_mem(&buf).unwrap();
+    image.write_to(&mut cursor, ImageOutputFormat::Png)?;
+    tess.set_image_from_mem(&buf)?;
   }
 
   let mut rows = Vec::new();
@@ -111,12 +114,6 @@ fn main() -> io::Result<()> {
           let width3 = x2 - x1 - 8;
           let height3 = y2 - y1 - 8;
 
-          // let view = image.view(x3,y3, width3, height3);
-
-          // for (x, y, color) in view.pixels() {
-          //   new_img.put_pixel(x1 + x + 4, y1 + y + 4, color);
-          // }
-
           let b = Box {
             x: x3 as i32,
             y: y3 as i32,
@@ -127,8 +124,7 @@ fn main() -> io::Result<()> {
           tess.set_rectangle(std::boxed::Box::new(b));
 
           columns.push(
-            tess.get_utf8_text()
-              .unwrap()
+            tess.get_utf8_text()?
               .replace('\n', " ")
               .trim()
               .to_string(),
@@ -144,26 +140,7 @@ fn main() -> io::Result<()> {
     }
   }
 
-  for x in rows {
-    println!("{:?}", x);
-  }
-
-  // println!("finished");
-  //
-  // let window = show_image::create_window("image", Default::default()).map_err(|e| e.to_string()).unwrap();
-  // window.set_image("abc", new_img).map_err(|e| e.to_string()).unwrap();
-  //
-  // // Wait for the window to be closed or Escape to be pressed.
-  // for event in window.event_channel().map_err(|e| e.to_string()).unwrap() {
-  //   if let event::WindowEvent::KeyboardInput(event) = event {
-  //     if !event.is_synthetic && event.input.key_code == Some(event::VirtualKeyCode::Escape) && event.input.state.is_pressed() {
-  //       println!("Escape pressed!");
-  //       break;
-  //     }
-  //   }
-  // }
-
-  Ok(())
+  Ok(rows)
 }
 
 fn clean_lines(mut lines: Vec<(u32, u32)>, threshold: u32, min_length: u32) -> Vec<(u32, u32)> {
